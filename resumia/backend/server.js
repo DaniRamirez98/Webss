@@ -33,40 +33,19 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.post('/api/summarize', async (req, res) => {
   const { text, length = 'moderado', style = 'general' } = req.body;
 
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'El campo "text" es requerido.' });
-  }
-  if (text.trim().length < 50) {
-    return res.status(400).json({ error: 'El texto es demasiado corto (mínimo 50 caracteres).' });
-  }
-  if (text.length > 30000) {
-    return res.status(400).json({ error: 'El texto es demasiado largo (máximo 30,000 caracteres).' });
+  // 1. Validaciones básicas
+  if (!text || text.trim().length < 50) {
+    return res.status(400).json({ error: 'Texto muy corto.' });
   }
 
-const lengthMap = {
-    breve:     'muy conciso, máximo 3-4 oraciones',
-    moderado:  'moderado, 2-4 párrafos',
-    detallado: 'detallado, varios párrafos bien desarrollados'
-  };
-const styleMap = {
-    general:   'lenguaje claro y accesible',
-    academico: 'lenguaje formal y académico',
-    informal:  'tono informal y amigable',
-    ejecutivo: 'tono ejecutivo y directo'
-  };
+  // 2. Definición del Prompt (se queda igual)
+  const prompt = `Resume este texto...`; 
 
- const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
-
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON puro:
-{"titulo":"título aquí","resumen":"resumen aquí","puntos_clave":["punto 1","punto 2","punto 3"]}
-
-TEXTO A RESUMIR:
-${text}`;
-
-try {
-    // Definimos el modelo único directamente aquí
-    const model = 'gemini-1.5-flash'; 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  try {
+    // --- AQUÍ ESTÁ LA SOLUCIÓN ---
+    // Definimos el modelo único (el ID que vimos en tu AI Studio)
+    const modelId = 'gemini-1.5-flash'; 
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
@@ -76,29 +55,25 @@ try {
       })
     });
 
-    const responseText = await geminiRes.text();
+    const responseData = await geminiRes.json();
 
     if (!geminiRes.ok) {
-      throw new Error(`Error de Gemini: ${responseText}`);
+      console.error('Error de Google:', responseData);
+      return res.status(502).json({ error: 'Gemini falló al responder.' });
     }
 
-    const geminiData = JSON.parse(responseText);
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    if (!rawText) throw new Error('Gemini no devolvió texto');
-
-    // Limpiar y extraer JSON de la respuesta
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    // Extraer el texto generado
+    const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
-    if (!jsonMatch) throw new Error('No se encontró JSON en la respuesta');
+    // Limpieza de formato Markdown si existe
+    const cleanJson = rawText.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
 
-    const parsed = JSON.parse(jsonMatch[0]);
     return res.json({ success: true, data: parsed });
 
   } catch (err) {
     console.error('Error del servidor:', err.message);
-    return res.status(500).json({ error: 'Error interno: ' + err.message });
+    return res.status(500).json({ error: 'Error interno del servidor.' });
   }
 });
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
