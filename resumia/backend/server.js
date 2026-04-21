@@ -1,15 +1,15 @@
- const express = require('express');
- const cors = require('cors');
- const rateLimit = require('express-rate-limit');
+const express = require('express');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
- app.set('trust proxy', 1);
- const PORT = process.env.PORT || 8080;
+app.set('trust proxy', 1);
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 
- const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
@@ -20,7 +20,7 @@ app.use(cors({
   }
 }));
 
- const limiter = rateLimit({
+const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: { error: 'Demasiadas solicitudes. Espera un momento.' }
@@ -55,7 +55,7 @@ const styleMap = {
     ejecutivo: 'tono ejecutivo y directo'
   };
 
-const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
+ const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON puro:
 {"titulo":"título aquí","resumen":"resumen aquí","puntos_clave":["punto 1","punto 2","punto 3"]}
@@ -65,39 +65,34 @@ ${text}`;
 
   try {
     // Intentar con gemini-2.0-flash primero, si falla usar gemini-pro
-const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
- let lastError = '';
+  const model = 'gemini-2.0-flash-exp';
+  let lastError = '';
     
     for (const model of models) {
- const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-const geminiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 1024
-          }
-        })
-      });
+ const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+ 
+    const geminiRes = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
 
     const responseText = await geminiRes.text();
       console.log(`Modelo ${model} - Status:`, geminiRes.status);
 
       if (!geminiRes.ok) {
-        lastError = responseText;
-        console.error(`Modelo ${model} falló:`, responseText.substring(0, 200));
-        continue; // probar siguiente modelo
-      }
+      console.error("Error de Gemini:", responseText);
+      return res.status(502).json({ error: 'Error con el modelo Gemini 2.5 Flash.' }); 
+    }
 
       let geminiData;
       try {
         geminiData = JSON.parse(responseText);
-      } catch (e) {
-        lastError = 'Respuesta no es JSON válido';
-        continue;
-      }
+      } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
