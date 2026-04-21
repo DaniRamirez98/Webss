@@ -269,33 +269,36 @@
     msgInterval = setInterval(() => { i = (i+1) % loadingMsgs.length; document.getElementById('loadingMsg').textContent = loadingMsgs[i]; }, 1800);
   }
 
-async function summarize() {
+  async function summarize() {
     const text = document.getElementById('inputText').value.trim();
     if (!text) { showError('Por favor ingresa un texto para resumir.'); return; }
-    if (text.length < 50) { showError('El texto es demasiado corto.'); return; }
+    if (text.length < 50) { showError('El texto es demasiado corto (mínimo 50 caracteres).'); return; }
     hideError();
     setState('loading');
     cycleLoading();
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(API_URL + '/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, length: selectedLength, style: selectedStyle })
       });
 
+      // Leer como texto primero para evitar error si no es JSON válido
       const rawResponse = await res.text();
-      console.log('STATUS:', res.status);
-      console.log('RESPUESTA CRUDA:', rawResponse);
+      let json;
+      try {
+        json = JSON.parse(rawResponse);
+      } catch (e) {
+        throw new Error('El servidor devolvió una respuesta inválida. Intenta de nuevo.');
+      }
 
-      // Mostrar respuesta cruda en pantalla para diagnóstico
+      if (!res.ok || !json.success) throw new Error(json.error || 'Error desconocido');
       clearInterval(msgInterval);
-      setState('empty');
-      showError('DIAGNÓSTICO - Respuesta del servidor: ' + rawResponse.substring(0, 300));
-
+      renderResult(json.data, text);
     } catch (err) {
       clearInterval(msgInterval);
       setState('empty');
-      showError('Error de red: ' + err.message);
+      showError('Error al generar el resumen: ' + err.message);
     }
   }
 
