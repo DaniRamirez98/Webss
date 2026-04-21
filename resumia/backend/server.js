@@ -42,47 +42,43 @@ app.post('/api/summarize', async (req, res) => {
   const prompt = `Resume este texto...`; 
 
 try {
-    // ID técnico único para Gemini 2.5 Flash (versión experimental/actual)
-    const modelId = 'gemini-2.0-flash-exp'; 
+    // Usamos el ID técnico que NUNCA falla en México
+    const modelId = 'gemini-1.5-flash'; 
     
-    // Usamos v1beta porque es donde Google tiene alojados los modelos 2.0/2.5 actualmente
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // Cambiamos a la versión estable v1
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    console.log(`Iniciando petición con modelo: ${modelId}`);
+    console.log(`Conectando con modelo estable: ${modelId}`);
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048
-        }
+        contents: [{ parts: [{ text: prompt }] }]
       })
     });
 
     const responseText = await geminiRes.text();
     
     if (!geminiRes.ok) {
-      console.error("Error detallado de Google:", responseText);
-      return res.status(502).json({ error: 'El modelo Gemini 2.5 Flash no respondió correctamente.' });
+      console.error("Error de Google:", responseText);
+      return res.status(502).json({ error: 'Error de conexión con Google.' });
     }
 
     const geminiData = JSON.parse(responseText);
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Limpiar el JSON que devuelve la IA
+    // Limpieza de JSON
     const clean = rawText.replace(/```json|```/g, '').trim();
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
     
-    if (!jsonMatch) throw new Error('No se pudo extraer el JSON del resumen.');
+    if (!jsonMatch) throw new Error('Respuesta malformada');
 
     const parsed = JSON.parse(jsonMatch[0]);
     return res.json({ success: true, data: parsed });
 
   } catch (err) {
-    console.error('Error Crítico:', err.message);
+    console.error('Error:', err.message);
     return res.status(500).json({ error: 'Error interno: ' + err.message });
   }
 });
