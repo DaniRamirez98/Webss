@@ -31,49 +31,43 @@ app.get('/', (req, res) => res.json({ message: 'ResumIA Backend activo ✓', ver
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.post('/api/summarize', async (req, res) => {
-  const { text, length = 'moderado', style = 'general' } = req.body;
+  try {
+    const { text } = req.body;
 
-  // 1. Validaciones básicas
-  if (!text || text.trim().length < 50) {
-    return res.status(400).json({ error: 'Texto muy corto.' });
-  }
+    if (!text || text.length < 50) {
+      return res.status(400).json({ error: 'Texto demasiado corto.' });
+    }
 
-  // 2. Definición del Prompt (se queda igual)
-  const prompt = `Resume este texto...`; 
+    // Usaremos el ID más básico y compatible
+    const model = 'gemini-1.5-flash';
+    // URL con v1 (versión estable)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-try {
-    const modelId = 'gemini-1.5-flash'; 
-    
-    // CAMBIO A v1beta: Es más flexible con los modelos nuevos en nuestra región
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-    console.log(`Petición enviada a: ${geminiUrl.split('?')[0]}`); // Log de seguridad
-
-    const geminiRes = await fetch(geminiUrl, {
+    const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        contents: [{ parts: [{ text: `Resume este texto en español: ${text}` }] }]
       })
     });
 
-    const responseText = await geminiRes.text();
-    
-    if (!geminiRes.ok) {
-      console.error("Error de Google:", responseText);
-      return res.status(502).json({ error: 'Fallo la conexión con el modelo.' });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Error de Google:', JSON.stringify(data));
+      return res.status(502).json({ error: 'Error en la API de Google.' });
     }
 
-    const geminiData = JSON.parse(responseText);
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-
-    return res.json({ success: true, data: JSON.parse(jsonMatch[0]) });
+    const summary = data.candidates[0].content.parts[0].text;
+    
+    return res.json({ 
+      success: true, 
+      data: { resumen: summary, titulo: "Resumen Generado", puntos_clave: [] } 
+    });
 
   } catch (err) {
-    console.error('Error:', err.message);
-    return res.status(500).json({ error: 'Error interno: ' + err.message });
+    console.error('Error crítico:', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
   }
 });
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
