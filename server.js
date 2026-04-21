@@ -34,9 +34,11 @@ app.post('/api/summarize', async (req, res) => {
   try {
     const { text } = req.body;
     
-    // Usamos el ID más estable para asegurar la conexión
-    const modelId = 'gemini-pro'; 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // USAMOS GEMINI-1.5-FLASH: Es el más rápido y compatible con v1 estable
+    const modelId = 'gemini-1.5-flash'; 
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+    console.log(`Solicitando a: models/${modelId} (v1)`);
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -49,17 +51,16 @@ app.post('/api/summarize', async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Respuesta de Google:', JSON.stringify(data));
-      // Si aquí sale 404 de nuevo, es que la API Key es la que está fallando.
-      return res.status(502).json({ error: 'Error de permisos con la API de Google.' });
+      console.error('Respuesta de error de Google:', JSON.stringify(data));
+      return res.status(502).json({ error: 'Permisos o modelo no encontrado en Google.' });
     }
 
     const summary = data.candidates[0].content.parts[0].text;
     return res.json({ success: true, data: { resumen: summary } });
 
   } catch (err) {
-    console.error('Error:', err.message);
-    return res.status(500).json({ error: 'Error interno.' });
+    console.error('Error del servidor:', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
   }
 });
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
