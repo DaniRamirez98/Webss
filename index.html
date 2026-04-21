@@ -277,7 +277,7 @@
     setState('loading');
     cycleLoading();
     try {
-      const res = await fetch(API_URL + '/summarize', {
+      const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, length: selectedLength, style: selectedStyle })
