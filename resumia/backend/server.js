@@ -65,7 +65,7 @@ ${text}`;
 
   try {
     // Intentar con gemini-2.0-flash primero, si falla usar gemini-pro
-  const model = 'gemini-2.0-flash-exp';
+const model = 'gemini-1.5-flash';
   let lastError = '';
     
     for (const model of models) {
