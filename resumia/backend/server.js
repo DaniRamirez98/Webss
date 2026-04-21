@@ -38,36 +38,35 @@ app.post('/api/summarize', async (req, res) => {
       return res.status(400).json({ error: 'Texto demasiado corto.' });
     }
 
-    // Usaremos el ID más básico y compatible
-    const model = 'gemini-1.5-flash';
-    // URL con v1 (versión estable)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // ID del modelo en minúsculas y sin errores de dedo
+    const modelId = 'gemini-1.5-flash';
+    
+    // URL usando v1beta (Solución común para el error 404 en AI Studio)
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+    console.log(`Conectando a: ${geminiUrl.split('?')[0]}`);
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Resume este texto en español: ${text}` }] }]
+        contents: [{ parts: [{ text: `Resume de forma profesional: ${text}` }] }]
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Error de Google:', JSON.stringify(data));
-      return res.status(502).json({ error: 'Error en la API de Google.' });
+      console.error('Detalle del error de Google:', JSON.stringify(data));
+      return res.status(502).json({ error: 'Google no encontró el modelo. Revisa la API Key.' });
     }
 
     const summary = data.candidates[0].content.parts[0].text;
-    
-    return res.json({ 
-      success: true, 
-      data: { resumen: summary, titulo: "Resumen Generado", puntos_clave: [] } 
-    });
+    return res.json({ success: true, data: { resumen: summary } });
 
   } catch (err) {
-    console.error('Error crítico:', err.message);
-    return res.status(500).json({ error: 'Error interno del servidor.' });
+    console.error('Error del servidor:', err.message);
+    return res.status(500).json({ error: 'Error interno.' });
   }
 });
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
