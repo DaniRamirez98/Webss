@@ -1,14 +1,14 @@
-const express = require('express');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+ const express = require('express');
+ const cors = require('cors');
+ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+ const app = express();
+ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
+ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
@@ -19,7 +19,7 @@ app.use(cors({
   }
 }));
 
-const limiter = rateLimit({
+ const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: { error: 'Demasiadas solicitudes. Espera un momento.' }
@@ -42,19 +42,19 @@ app.post('/api/summarize', async (req, res) => {
     return res.status(400).json({ error: 'El texto es demasiado largo (máximo 30,000 caracteres).' });
   }
 
-  const lengthMap = {
+const lengthMap = {
     breve:     'muy conciso, máximo 3-4 oraciones',
     moderado:  'moderado, 2-4 párrafos',
     detallado: 'detallado, varios párrafos bien desarrollados'
   };
-  const styleMap = {
+const styleMap = {
     general:   'lenguaje claro y accesible',
     academico: 'lenguaje formal y académico',
     informal:  'tono informal y amigable',
     ejecutivo: 'tono ejecutivo y directo'
   };
 
-  const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
+const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
 
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON puro:
 {"titulo":"título aquí","resumen":"resumen aquí","puntos_clave":["punto 1","punto 2","punto 3"]}
@@ -64,12 +64,12 @@ ${text}`;
 
   try {
     // Intentar con gemini-2.0-flash primero, si falla usar gemini-pro
-    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
-    let lastError = '';
+const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+let lastError = '';
     
     for (const model of models) {
-const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-const geminiRes = await fetch(geminiUrl, {
+ const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+ const geminiRes = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,7 +81,7 @@ const geminiRes = await fetch(geminiUrl, {
         })
       });
 
-      const responseText = await geminiRes.text();
+    const responseText = await geminiRes.text();
       console.log(`Modelo ${model} - Status:`, geminiRes.status);
 
       if (!geminiRes.ok) {
@@ -98,7 +98,7 @@ const geminiRes = await fetch(geminiUrl, {
         continue;
       }
 
-      const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       if (!rawText) {
         lastError = 'Gemini no devolvió texto';
@@ -107,8 +107,8 @@ const geminiRes = await fetch(geminiUrl, {
       }
 
       // Limpiar y extraer JSON
-      const clean = rawText.replace(/```json|```/g, '').trim();
-      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    const clean = rawText.replace(/```json|```/g, '').trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
 
       if (!jsonMatch) {
         lastError = 'No se encontró JSON en respuesta';
