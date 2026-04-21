@@ -63,14 +63,11 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backti
 TEXTO A RESUMIR:
 ${text}`;
 
-  try {
-    // Intentar con gemini-2.0-flash primero, si falla usar gemini-pro
-const model = 'gemini-1.5-flash';
-  let lastError = '';
-    
-    for (const model of models) {
- const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
- 
+try {
+    // Definimos el modelo único directamente aquí
+    const model = 'gemini-1.5-flash'; 
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -80,63 +77,28 @@ const model = 'gemini-1.5-flash';
     });
 
     const responseText = await geminiRes.text();
-      console.log(`Modelo ${model} - Status:`, geminiRes.status);
 
-      if (!geminiRes.ok) {
-      console.error("Error de Gemini:", responseText);
-      return res.status(502).json({ error: 'Error con el modelo Gemini 2.5 Flash.' }); 
+    if (!geminiRes.ok) {
+      throw new Error(`Error de Gemini: ${responseText}`);
     }
 
-      let geminiData;
-      try {
-        geminiData = JSON.parse(responseText);
-      } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-
+    const geminiData = JSON.parse(responseText);
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      if (!rawText) {
-        lastError = 'Gemini no devolvió texto';
-        console.error('Sin texto en respuesta:', JSON.stringify(geminiData).substring(0, 200));
-        continue;
-      }
+    if (!rawText) throw new Error('Gemini no devolvió texto');
 
-      // Limpiar y extraer JSON
+    // Limpiar y extraer JSON de la respuesta
     const clean = rawText.replace(/```json|```/g, '').trim();
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    
+    if (!jsonMatch) throw new Error('No se encontró JSON en la respuesta');
 
-      if (!jsonMatch) {
-        lastError = 'No se encontró JSON en respuesta';
-        console.error('Sin JSON en:', clean.substring(0, 200));
-        continue;
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch (parseErr) {
-        lastError = 'JSON malformado';
-        continue;
-      }
-
-      if (!parsed.titulo || !parsed.resumen) {
-        lastError = 'JSON incompleto';
-        continue;
-      }
-
-      console.log(`✅ Éxito con modelo: ${model}`);
-      return res.json({ success: true, data: parsed });
-    }
-
-    // Si todos los modelos fallaron
-    console.error('Todos los modelos fallaron. Último error:', lastError);
-    return res.status(502).json({ error: 'No se pudo conectar con Gemini. Verifica tu API Key.' });
+    const parsed = JSON.parse(jsonMatch[0]);
+    return res.json({ success: true, data: parsed });
 
   } catch (err) {
     console.error('Error del servidor:', err.message);
     return res.status(500).json({ error: 'Error interno: ' + err.message });
   }
 });
-
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
