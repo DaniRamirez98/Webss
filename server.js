@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 
+// Configuración de CORS para Railway/Producción
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
 app.use(cors({
   origin: (origin, callback) => {
@@ -25,45 +26,68 @@ const limiter = rateLimit({
   max: 10,
   message: { error: 'Demasiadas solicitudes. Espera un momento.' }
 });
-app.use('/api/summarize', limiter);
 
-app.get('/', (req, res) => res.json({ message: 'ResumIA Backend activo ✓', version: '1.0' }));
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/', (req, res) => res.json({ message: 'ResumIA Backend activo ✓', version: '1.1' }));
 
-app.post('/api/summarize', async (req, res) => {
+// RUTA PRINCIPAL CORREGIDA
+app.post('/api/summarize', limiter, async (req, res) => {
   try {
     const { text } = req.body;
-    
-    // ID técnico exacto
-    const modelId = 'gemini-1.5-flash'; 
-    
-    // CAMBIO CLAVE: Usamos v1beta y el path 'models/' explícito
+
+    // Validación de entrada
+    if (!text || text.length < 20) {
+      return res.status(400).json({ error: 'El texto es muy corto para generar un resumen de calidad.' });
+    }
+
+    const modelId = 'gemini-1.5-flash-latest';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    console.log(`Intentando conectar con: models/${modelId} en v1beta`);
+    const prompt = `Actúa como un experto en síntesis de información. 
+    Analiza el siguiente texto y devuelve estrictamente un objeto JSON con esta estructura:
+    {
+      "titulo": "Un título elegante y breve",
+      "resumen": "Un resumen fluido en uno o dos párrafos",
+      "puntos_clave": ["mínimo 3 puntos clave", "relevantes", "concisos"]
+    }
+    
+    Texto a procesar: ${text}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Resume el siguiente texto de forma concisa: ${text}` }] }]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          response_mime_type: "application/json",
+          temperature: 0.7,
+          maxOutputTokens: 1000
+        }
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Respuesta de Google:', JSON.stringify(data));
-      // Si sale 404 aquí, el problema es la API Key
-      return res.status(502).json({ error: 'Google no reconoce el modelo o la versión.' });
+      console.error('Error de Google:', data);
+      return res.status(502).json({ error: 'Error en la respuesta de la inteligencia artificial.' });
     }
 
-    const summary = data.candidates[0].content.parts[0].text;
-    return res.json({ success: true, data: { resumen: summary } });
+    // Extraer y parsear el string JSON que devuelve Gemini
+    const contentString = data.candidates[0].content.parts[0].text;
+    const structuredData = JSON.parse(contentString);
+
+    // Respuesta final que el frontend leerá perfectamente
+    return res.json({
+      success: true,
+      data: structuredData
+    });
 
   } catch (err) {
-    console.error('Error del servidor:', err.message);
-    return res.status(500).json({ error: 'Error interno del servidor.' });
+    console.error('Error del servidor:', err);
+    return res.status(500).json({ error: 'Ocurrió un error inesperado en el servidor.' });
   }
 });
-app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
