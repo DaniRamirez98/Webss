@@ -33,39 +33,32 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.post('/api/summarize', async (req, res) => {
   try {
     const { text } = req.body;
-
-    if (!text || text.length < 50) {
-      return res.status(400).json({ error: 'Texto demasiado corto.' });
-    }
-
-    // ID del modelo en minúsculas y sin errores de dedo
-    const modelId = 'gemini-1.5-flash';
     
-    // URL usando v1beta (Solución común para el error 404 en AI Studio)
+    // Usamos el ID más estable para asegurar la conexión
+    const modelId = 'gemini-pro'; 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-    console.log(`Conectando a: ${geminiUrl.split('?')[0]}`);
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Resume de forma profesional: ${text}` }] }]
+        contents: [{ parts: [{ text: `Resume este texto: ${text}` }] }]
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Detalle del error de Google:', JSON.stringify(data));
-      return res.status(502).json({ error: 'Google no encontró el modelo. Revisa la API Key.' });
+      console.error('Respuesta de Google:', JSON.stringify(data));
+      // Si aquí sale 404 de nuevo, es que la API Key es la que está fallando.
+      return res.status(502).json({ error: 'Error de permisos con la API de Google.' });
     }
 
     const summary = data.candidates[0].content.parts[0].text;
     return res.json({ success: true, data: { resumen: summary } });
 
   } catch (err) {
-    console.error('Error del servidor:', err.message);
+    console.error('Error:', err.message);
     return res.status(500).json({ error: 'Error interno.' });
   }
 });
