@@ -6,10 +6,8 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Middlewares ──────────────────────────────────────────────
 app.use(express.json());
 
-// CORS: solo permite peticiones desde tu dominio
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
 app.use(cors({
   origin: (origin, callback) => {
@@ -21,19 +19,19 @@ app.use(cors({
   }
 }));
 
-// Rate limit: máximo 10 resúmenes por minuto por IP
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
-  message: { error: 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.' }
+  message: { error: 'Demasiadas solicitudes. Espera un momento.' }
 });
 app.use('/api/summarize', limiter);
 
-// ── Ruta principal ───────────────────────────────────────────
+app.get('/', (req, res) => res.json({ message: 'ResumIA Backend activo ✓', version: '1.0' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
 app.post('/api/summarize', async (req, res) => {
   const { text, length = 'moderado', style = 'general' } = req.body;
 
-  // Validaciones
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'El campo "text" es requerido.' });
   }
@@ -45,29 +43,21 @@ app.post('/api/summarize', async (req, res) => {
   }
 
   const lengthMap = {
-    breve:    'muy conciso, máximo 3-4 oraciones para el resumen principal',
-    moderado: 'moderado, 2-4 párrafos para el resumen principal',
-    detallado:'detallado y completo, varios párrafos bien desarrollados'
+    breve:     'muy conciso, máximo 3-4 oraciones',
+    moderado:  'moderado, 2-4 párrafos',
+    detallado: 'detallado, varios párrafos bien desarrollados'
   };
   const styleMap = {
-    general:   'lenguaje claro y accesible para el público general',
-    academico: 'lenguaje formal y académico, preciso y técnico',
-    informal:  'tono informal, amigable y fácil de leer',
-    ejecutivo: 'tono ejecutivo y directo, enfocado en conclusiones accionables'
+    general:   'lenguaje claro y accesible',
+    academico: 'lenguaje formal y académico',
+    informal:  'tono informal y amigable',
+    ejecutivo: 'tono ejecutivo y directo'
   };
 
-  const prompt = `Eres un experto en síntesis y análisis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
+  const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
 
-Responde ÚNICAMENTE en formato JSON válido, sin backticks ni texto extra:
-{
-  "titulo": "Título descriptivo y atractivo",
-  "resumen": "Resumen principal del texto.",
-  "puntos_clave": [
-    "Punto clave 1",
-    "Punto clave 2",
-    "Punto clave 3"
-  ]
-}
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON:
+{"titulo":"título aquí","resumen":"resumen aquí","puntos_clave":["punto 1","punto 2","punto 3"]}
 
 TEXTO:
 ${text}`;
@@ -80,49 +70,62 @@ ${text}`;
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 1024 }
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024,
+          responseMimeType: 'application/json'
+        }
       })
     });
 
+    const responseText = await geminiRes.text();
+
     if (!geminiRes.ok) {
-      const errData = await geminiRes.json();
-      console.error('Error Gemini:', errData);
+      console.error('Error Gemini status:', geminiRes.status, responseText);
       return res.status(502).json({ error: 'Error al conectar con Gemini. Intenta más tarde.' });
     }
 
-    const geminiData = await geminiRes.json();
+    let geminiData;
+    try {
+      geminiData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Error parseando respuesta de Gemini:', responseText);
+      return res.status(502).json({ error: 'Respuesta inválida de Gemini.' });
+    }
+
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     if (!rawText) {
-      return res.status(502).json({ error: 'Gemini no devolvió contenido. Intenta con un texto más corto.' });
+      console.error('Gemini no devolvió texto:', JSON.stringify(geminiData));
+      return res.status(502).json({ error: 'Gemini no devolvió contenido. Intenta con un texto diferente.' });
     }
-    // Limpiar markdown y extraer solo el JSON
+
     const clean = rawText.replace(/```json|```/g, '').trim();
-    // Extraer el objeto JSON aunque venga con texto extra
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
+
     if (!jsonMatch) {
-      return res.status(502).json({ error: 'No se pudo procesar la respuesta de Gemini.' });
+      console.error('No se encontró JSON en respuesta:', clean);
+      return res.status(502).json({ error: 'No se pudo procesar la respuesta. Intenta de nuevo.' });
     }
 
     let parsed;
     try {
       parsed = JSON.parse(jsonMatch[0]);
     } catch (parseErr) {
-      return res.status(502).json({ error: 'Respuesta de Gemini malformada. Intenta de nuevo.' });
+      console.error('Error parseando JSON extraído:', jsonMatch[0]);
+      return res.status(502).json({ error: 'Error al procesar el resumen. Intenta de nuevo.' });
     }
-    
+
+    if (!parsed.titulo || !parsed.resumen) {
+      return res.status(502).json({ error: 'Respuesta incompleta de Gemini. Intenta de nuevo.' });
+    }
+
     return res.json({ success: true, data: parsed });
 
   } catch (err) {
     console.error('Error del servidor:', err.message);
-    return res.status(500).json({ error: 'Error interno del servidor.' });
+    return res.status(500).json({ error: 'Error interno del servidor: ' + err.message });
   }
 });
-
-// Ruta raíz
-app.get('/', (req, res) => res.json({ message: 'ResumIA Backend activo ✓', version: '1.0' }));
-
-// Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
