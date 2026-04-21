@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResumIA — Sintetiza lo esencial</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0e0e0e;
+    --paper: #f5f0e8;
+    --accent: #c8472b;
+    --accent2: #2b6cc8;
+    --muted: #8a8378;
+    --card: #fffdf8;
+    --border: #d6cfc2;
+    --shadow: rgba(14,14,14,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 80% 0%, rgba(200,71,43,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse at 10% 90%, rgba(43,108,200,0.06) 0%, transparent 50%);
+  }
+  header {
+    padding: 2.5rem 3rem 1.5rem;
+    display: flex;
+    align-items: flex-end;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-mark {
+    width: 52px; height: 52px;
+    background: var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 4px 4px 0 var(--ink);
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 28px; height: 28px; fill: white; }
+  .logo-text h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; line-height: 1; }
+  .logo-text span { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  .badge { margin-left: auto; background: var(--ink); color: var(--paper); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.8rem; border-radius: 100px; font-weight: 500; }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 2.5rem 3rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 6px 6px 0 var(--shadow); overflow: hidden; transition: box-shadow 0.2s; }
+  .panel:hover { box-shadow: 8px 8px 0 rgba(14,14,14,0.16); }
+  .panel-header { padding: 1.2rem 1.5rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.6); }
+  .panel-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-red { background: var(--accent); }
+  .dot-blue { background: var(--accent2); }
+  .char-count { font-size: 0.72rem; color: var(--muted); }
+
+  textarea { width: 100%; min-height: 360px; padding: 1.5rem; border: none; background: transparent; resize: vertical; font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 300; line-height: 1.75; color: var(--ink); outline: none; }
+  textarea::placeholder { color: var(--muted); font-style: italic; }
+
+  .options-row { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; background: rgba(255,255,255,0.4); }
+  .options-row label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  .pill-group { display: flex; gap: 0.4rem; }
+  .pill { padding: 0.35rem 0.9rem; border: 1px solid var(--border); border-radius: 100px; font-size: 0.78rem; font-family: 'DM Sans', sans-serif; background: transparent; cursor: pointer; transition: all 0.15s; color: var(--ink); }
+  .pill:hover { border-color: var(--accent); color: var(--accent); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 500; }
+
+  .btn-summarize { margin: 1rem 1.5rem 1.5rem; width: calc(100% - 3rem); padding: 1rem; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); border-radius: 10px; font-family: 'Playfair Display', serif; font-size: 1.05rem; font-style: italic; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem; transition: all 0.2s; position: relative; overflow: hidden; }
+  .btn-summarize::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); transition: transform 0.3s ease; }
+  .btn-summarize:hover::before { transform: translateX(0); }
+  .btn-summarize span, .btn-summarize svg { position: relative; z-index: 1; }
+  .btn-summarize:hover { border-color: var(--accent); }
+  .btn-summarize:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-summarize:disabled::before { transform: translateX(-100%) !important; }
+
+  .output-body { padding: 1.5rem; min-height: 400px; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; gap: 1rem; color: var(--muted); text-align: center; }
+  .empty-state .big-icon { font-size: 3.5rem; opacity: 0.3; }
+  .empty-state p { font-size: 0.85rem; max-width: 200px; line-height: 1.6; font-style: italic; }
+
+  .loading-state { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; gap: 1.5rem; }
+  .loader { display: flex; gap: 6px; }
+  .loader span { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s ease-in-out infinite; }
+  .loader span:nth-child(2) { animation-delay: 0.2s; background: var(--ink); }
+  .loader span:nth-child(3) { animation-delay: 0.4s; background: var(--accent2); }
+  @keyframes bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
+  .loading-state p { font-size: 0.85rem; color: var(--muted); font-style: italic; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+  .result-content { display: none; animation: fadeUp 0.4s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .summary-title { font-family: 'Playfair Display', serif; font-size: 1.35rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.3; }
+  .summary-divider { width: 40px; height: 3px; background: var(--accent); border-radius: 2px; margin-bottom: 1.2rem; }
+  .summary-text { font-size: 0.92rem; line-height: 1.85; color: #2a2420; }
+  .key-points { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.2rem; }
+  .key-points-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); font-weight: 500; margin-bottom: 0.8rem; }
+  .key-point { display: flex; gap: 0.7rem; margin-bottom: 0.6rem; font-size: 0.87rem; line-height: 1.6; align-items: flex-start; }
+  .key-point-bullet { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: white; font-size: 0.62rem; font-weight: 700; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+
+  .tts-bar { padding: 1rem 1.5rem; border-top: 1px solid var(--border); background: rgba(255,255,255,0.4); display: none; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .tts-bar.visible { display: flex; }
+  .btn-tts { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.1rem; border: 1.5px solid var(--border); border-radius: 8px; background: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; transition: all 0.15s; color: var(--ink); }
+  .btn-tts:hover { border-color: var(--accent2); color: var(--accent2); }
+  .btn-tts.playing { background: var(--accent2); border-color: var(--accent2); color: white; }
+  .btn-tts svg { width: 14px; height: 14px; }
+  .speed-select { font-size: 0.78rem; padding: 0.4rem 0.6rem; border: 1.5px solid var(--border); border-radius: 6px; background: white; font-family: 'DM Sans', sans-serif; color: var(--ink); cursor: pointer; outline: none; }
+  .tts-progress { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; min-width: 80px; }
+  .tts-progress-fill { height: 100%; background: var(--accent2); width: 0%; transition: width 0.3s; border-radius: 2px; }
+
+  .stats-bar { display: none; gap: 1.5rem; padding: 0 1.5rem 1rem; }
+  .stats-bar.visible { display: flex; }
+  .stat { text-align: center; }
+  .stat-num { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
+
+  .action-row { padding: 0.75rem 1.5rem 1.2rem; display: none; gap: 0.6rem; }
+  .action-row.visible { display: flex; }
+  .btn-action { padding: 0.4rem 0.9rem; border: 1px solid var(--border); border-radius: 6px; background: transparent; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+  .btn-action:hover { border-color: var(--ink); color: var(--ink); background: white; }
+
+  .error-msg { display: none; margin: 1rem 1.5rem; padding: 1rem; background: #fff0ee; border: 1px solid #f5c6bb; border-radius: 8px; font-size: 0.83rem; color: #8b2e1c; line-height: 1.5; }
+  .error-msg.visible { display: block; }
+
+  footer { text-align: center; padding: 1.5rem; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; border-top: 1px solid var(--border); margin-top: 1rem; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; padding: 1.5rem; }
+    header { padding: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16v2H4V4zm0 4h12v2H4V8zm0 4h16v2H4v-2zm0 4h8v2H4v-2z"/></svg>
+  </div>
+  <div class="logo-text">
+    <h1>ResumIA</h1>
+    <span>Sintetiza lo esencial</span>
+  </div>
+  <span class="badge">IA Powered</span>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot dot-red"></span>Texto de entrada</div>
+      <span class="char-count" id="charCount">0 caracteres</span>
+    </div>
+    <textarea id="inputText" placeholder="Pega aquí el texto que deseas resumir..."></textarea>
+    <div class="options-row">
+      <label>Extensión:</label>
+      <div class="pill-group" id="lengthGroup">
+        <button class="pill" data-val="breve">Breve</button>
+        <button class="pill active" data-val="moderado">Moderado</button>
+        <button class="pill" data-val="detallado">Detallado</button>
+      </div>
+    </div>
+    <div class="options-row">
+      <label>Estilo:</label>
+      <div class="pill-group" id="styleGroup">
+        <button class="pill active" data-val="general">General</button>
+        <button class="pill" data-val="academico">Académico</button>
+        <button class="pill" data-val="informal">Informal</button>
+        <button class="pill" data-val="ejecutivo">Ejecutivo</button>
+      </div>
+    </div>
+    <button class="btn-summarize" id="btnSummarize" onclick="summarize()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg>
+      <span>Resumir con IA</span>
+    </button>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot dot-blue"></span>Resumen generado</div>
+      <span class="char-count" id="summaryCharCount"></span>
+    </div>
+    <div class="output-body">
+      <div class="empty-state" id="emptyState">
+        <div class="big-icon">✦</div>
+        <p>El resumen aparecerá aquí una vez que proceses tu texto</p>
+      </div>
+      <div class="loading-state" id="loadingState">
+        <div class="loader"><span></span><span></span><span></span></div>
+        <p id="loadingMsg">Analizando el contenido...</p>
+      </div>
+      <div class="result-content" id="resultContent">
+        <div class="summary-title" id="summaryTitle"></div>
+        <div class="summary-divider"></div>
+        <div class="summary-text" id="summaryText"></div>
+        <div class="key-points" id="keyPointsSection">
+          <div class="key-points-label">Puntos clave</div>
+          <div id="keyPointsList"></div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat"><div class="stat-num" id="statOriginal">—</div><div class="stat-label">palabras originales</div></div>
+      <div class="stat"><div class="stat-num" id="statResumen">—</div><div class="stat-label">palabras resumen</div></div>
+      <div class="stat"><div class="stat-num" id="statReduccion">—</div><div class="stat-label">reducción</div></div>
+    </div>
+    <div class="tts-bar" id="ttsBar">
+      <button class="btn-tts" id="btnPlay" onclick="togglePlay()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" id="playIcon"/></svg>
+        <span id="playLabel">Escuchar</span>
+      </button>
+      <button class="btn-tts" onclick="stopSpeech()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+        <span>Detener</span>
+      </button>
+      <select class="speed-select" id="speedSelect" onchange="updateSpeed()">
+        <option value="0.7">0.7×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.3">1.3×</option>
+        <option value="1.6">1.6×</option>
+      </select>
+      <div class="tts-progress"><div class="tts-progress-fill" id="ttsProgressFill"></div></div>
+    </div>
+    <div class="action-row" id="actionRow">
+      <button class="btn-action" onclick="copyResult()">✦ Copiar</button>
+      <button class="btn-action" onclick="downloadResult()">↓ Descargar</button>
+      <button class="btn-action" onclick="clearAll()">✕ Limpiar</button>
+    </div>
+  </div>
+</main>
+
+<footer>ResumIA · Powered by Gemini AI · Tus textos no se almacenan</footer>
+
+<script>
+  // ── IMPORTANTE: Cambia esta URL por la de tu backend desplegado ──
+  const API_URL = 'https://webss-production.up.railway.app/api/summarize';
+  // ────────────────────────────────────────────────────────────────
+
+  let selectedLength = 'moderado';
+  let selectedStyle = 'general';
+  let currentSummary = '';
+  let currentPoints = [];
+  let isSpeaking = false;
+  let utterance = null;
+
+  document.getElementById('lengthGroup').addEventListener('click', e => {
+    if (!e.target.dataset.val) return;
+    document.querySelectorAll('#lengthGroup .pill').forEach(p => p.classList.remove('active'));
+    e.target.classList.add('active');
+    selectedLength = e.target.dataset.val;
+  });
+  document.getElementById('styleGroup').addEventListener('click', e => {
+    if (!e.target.dataset.val) return;
+    document.querySelectorAll('#styleGroup .pill').forEach(p => p.classList.remove('active'));
+    e.target.classList.add('active');
+    selectedStyle = e.target.dataset.val;
+  });
+
+  document.getElementById('inputText').addEventListener('input', function() {
+    document.getElementById('charCount').textContent = this.value.length.toLocaleString() + ' caracteres';
+  });
+
+  const loadingMsgs = ['Analizando el contenido...','Identificando ideas principales...','Construyendo el resumen...','Extrayendo puntos clave...','Refinando la síntesis...'];
+  let msgInterval;
+  function cycleLoading() {
+    let i = 0;
+    document.getElementById('loadingMsg').textContent = loadingMsgs[0];
+    msgInterval = setInterval(() => { i = (i+1) % loadingMsgs.length; document.getElementById('loadingMsg').textContent = loadingMsgs[i]; }, 1800);
+  }
+
+  async function summarize() {
+    const text = document.getElementById('inputText').value.trim();
+    if (!text) { showError('Por favor ingresa un texto para resumir.'); return; }
+    if (text.length < 50) { showError('El texto es demasiado corto (mínimo 50 caracteres).'); return; }
+    hideError();
+    setState('loading');
+    cycleLoading();
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, length: selectedLength, style: selectedStyle })
+      });
+
+      // Leer como texto primero para evitar error si no es JSON válido
+      const rawResponse = await res.text();
+      let json;
+      try {
+        json = JSON.parse(rawResponse);
+      } catch (e) {
+        throw new Error('El servidor devolvió una respuesta inválida. Intenta de nuevo.');
+      }
+
+      if (!res.ok || !json.success) throw new Error(json.error || 'Error desconocido');
+      clearInterval(msgInterval);
+      renderResult(json.data, text);
+    } catch (err) {
+      clearInterval(msgInterval);
+      setState('empty');
+      showError('Error al generar el resumen: ' + err.message);
+    }
+  }
+
+  function renderResult(parsed, originalText) {
+    currentSummary = parsed.resumen;
+    currentPoints = parsed.puntos_clave || [];
+    document.getElementById('summaryTitle').textContent = parsed.titulo || 'Resumen';
+    document.getElementById('summaryText').textContent = parsed.resumen;
+    const list = document.getElementById('keyPointsList');
+    list.innerHTML = '';
+    currentPoints.forEach((pt, i) => {
+      const div = document.createElement('div');
+      div.className = 'key-point';
+      div.innerHTML = `<span class="key-point-bullet">${i+1}</span><span>${pt}</span>`;
+      list.appendChild(div);
+    });
+    const origWords = originalText.split(/\s+/).filter(Boolean).length;
+    const sumWords = parsed.resumen.split(/\s+/).filter(Boolean).length;
+    const reduction = Math.max(0, Math.round((1 - sumWords/origWords) * 100));
+    document.getElementById('statOriginal').textContent = origWords.toLocaleString();
+    document.getElementById('statResumen').textContent = sumWords.toLocaleString();
+    document.getElementById('statReduccion').textContent = reduction + '%';
+    document.getElementById('summaryCharCount').textContent = sumWords + ' palabras';
+    setState('result');
+  }
+
+  function setState(state) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('resultContent').style.display = 'none';
+    document.getElementById('ttsBar').classList.remove('visible');
+    document.getElementById('actionRow').classList.remove('visible');
+    document.getElementById('statsBar').classList.remove('visible');
+    document.getElementById('btnSummarize').disabled = false;
+    if (state === 'empty') document.getElementById('emptyState').style.display = 'flex';
+    else if (state === 'loading') { document.getElementById('loadingState').style.display = 'flex'; document.getElementById('btnSummarize').disabled = true; }
+    else if (state === 'result') {
+      document.getElementById('resultContent').style.display = 'block';
+      document.getElementById('ttsBar').classList.add('visible');
+      document.getElementById('actionRow').classList.add('visible');
+      document.getElementById('statsBar').classList.add('visible');
+    }
+  }
+
+  function showError(msg) { const e = document.getElementById('errorMsg'); e.textContent = msg; e.classList.add('visible'); }
+  function hideError() { document.getElementById('errorMsg').classList.remove('visible'); }
+
+  function togglePlay() {
+    if (isSpeaking) { speechSynthesis.pause(); isSpeaking = false; updatePlayBtn(false); }
+    else if (speechSynthesis.paused) { speechSynthesis.resume(); isSpeaking = true; updatePlayBtn(true); }
+    else startSpeech();
+  }
+  function startSpeech() {
+    speechSynthesis.cancel();
+    let text = currentSummary + '. Puntos clave: ' + currentPoints.join('. ');
+    utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-ES';
+    utterance.rate = parseFloat(document.getElementById('speedSelect').value);
+    const voices = speechSynthesis.getVoices();
+    const esVoice = voices.find(v => v.lang.startsWith('es'));
+    if (esVoice) utterance.voice = esVoice;
+    utterance.onboundary = e => {
+      document.getElementById('ttsProgressFill').style.width = Math.min(100, Math.round(e.charIndex / text.length * 100)) + '%';
+    };
+    utterance.onend = () => { isSpeaking = false; updatePlayBtn(false); setTimeout(() => document.getElementById('ttsProgressFill').style.width = '0%', 1000); };
+    speechSynthesis.speak(utterance);
+    isSpeaking = true;
+    updatePlayBtn(true);
+  }
+  function stopSpeech() { speechSynthesis.cancel(); isSpeaking = false; updatePlayBtn(false); document.getElementById('ttsProgressFill').style.width = '0%'; }
+  function updateSpeed() { if (isSpeaking) { stopSpeech(); setTimeout(startSpeech, 100); } }
+  function updatePlayBtn(playing) {
+    document.getElementById('btnPlay').classList.toggle('playing', playing);
+    document.getElementById('playLabel').textContent = playing ? 'Pausar' : 'Escuchar';
+    document.getElementById('playIcon').setAttribute('d', playing ? 'M6 19h4V5H6v14zm8-14v14h4V5h-4z' : 'M8 5v14l11-7z');
+  }
+
+  function copyResult() {
+    let t = document.getElementById('summaryTitle').textContent + '\n\n' + currentSummary + '\n\nPuntos clave:\n';
+    currentPoints.forEach((p, i) => t += `${i+1}. ${p}\n`);
+    navigator.clipboard.writeText(t).then(() => { event.target.textContent = '✓ Copiado'; setTimeout(() => event.target.textContent = '✦ Copiar', 1800); });
+  }
+  function downloadResult() {
+    let t = '=== RESUMEN RESUMIA ===\n\n' + document.getElementById('summaryTitle').textContent + '\n' + '─'.repeat(40) + '\n\n' + currentSummary + '\n\nPUNTOS CLAVE:\n';
+    currentPoints.forEach((p, i) => t += `${i+1}. ${p}\n`);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([t], { type: 'text/plain;charset=utf-8' }));
+    a.download = 'resumen.txt'; a.click();
+  }
+  function clearAll() { stopSpeech(); document.getElementById('inputText').value = ''; document.getElementById('charCount').textContent = '0 caracteres'; hideError(); setState('empty'); currentSummary = ''; currentPoints = []; document.getElementById('summaryCharCount').textContent = ''; }
+
+  setState('empty');
+</script>
+</body>
+</html>
