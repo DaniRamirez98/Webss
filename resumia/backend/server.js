@@ -42,12 +42,13 @@ app.post('/api/summarize', async (req, res) => {
   const prompt = `Resume este texto...`; 
 
 try {
-    const modelId = 'gemini-1.5-flash'; 
+    // CAMBIO CLAVE: El ID debe incluir el prefijo 'models/' para que v1beta lo encuentre
+    const modelPath = 'models/gemini-1.5-flash'; 
     
-    // CAMBIO A v1beta: Es más flexible con los modelos nuevos en nuestra región
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // Construimos la URL usando el path completo
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    console.log(`Petición enviada a: ${geminiUrl.split('?')[0]}`); // Log de seguridad
+    console.log(`Solicitando recurso a Google: ${modelPath}`);
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
@@ -60,20 +61,19 @@ try {
     const responseText = await geminiRes.text();
     
     if (!geminiRes.ok) {
-      console.error("Error de Google:", responseText);
-      return res.status(502).json({ error: 'Fallo la conexión con el modelo.' });
+      console.error("Respuesta de error de Google:", responseText);
+      return res.status(502).json({ error: 'El modelo no está disponible actualmente.' });
     }
 
     const geminiData = JSON.parse(responseText);
+    // ... (el resto de tu lógica de parseo de JSON se queda igual)
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = rawText.replace(/```json|```/g, '').trim();
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-
-    return res.json({ success: true, data: JSON.parse(jsonMatch[0]) });
+    return res.json({ success: true, data: JSON.parse(clean) });
 
   } catch (err) {
-    console.error('Error:', err.message);
-    return res.status(500).json({ error: 'Error interno: ' + err.message });
+    console.error('Error interno:', err.message);
+    return res.status(500).json({ error: 'Error en el servidor.' });
   }
 });
 app.listen(PORT, () => console.log(`✅ ResumIA backend corriendo en puerto ${PORT}`));
