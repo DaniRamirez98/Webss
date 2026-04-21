@@ -34,25 +34,28 @@ app.post('/api/summarize', async (req, res) => {
   try {
     const { text } = req.body;
     
-    // USAMOS GEMINI-1.5-FLASH: Es el más rápido y compatible con v1 estable
+    // ID técnico exacto
     const modelId = 'gemini-1.5-flash'; 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    
+    // CAMBIO CLAVE: Usamos v1beta y el path 'models/' explícito
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    console.log(`Solicitando a: models/${modelId} (v1)`);
+    console.log(`Intentando conectar con: models/${modelId} en v1beta`);
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `Resume este texto: ${text}` }] }]
+        contents: [{ parts: [{ text: `Resume el siguiente texto de forma concisa: ${text}` }] }]
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Respuesta de error de Google:', JSON.stringify(data));
-      return res.status(502).json({ error: 'Permisos o modelo no encontrado en Google.' });
+      console.error('Respuesta de Google:', JSON.stringify(data));
+      // Si sale 404 aquí, el problema es la API Key
+      return res.status(502).json({ error: 'Google no reconoce el modelo o la versión.' });
     }
 
     const summary = data.candidates[0].content.parts[0].text;
