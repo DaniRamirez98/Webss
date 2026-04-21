@@ -234,7 +234,7 @@
 
 <script>
   // ── IMPORTANTE: Cambia esta URL por la de tu backend desplegado ──
-  const API_URL = 'https://TU-BACKEND.railway.app/api/summarize';
+  const API_URL = 'webss-production.up.railway.app';
   // ────────────────────────────────────────────────────────────────
 
   let selectedLength = 'moderado';
@@ -282,7 +282,16 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, length: selectedLength, style: selectedStyle })
       });
-      const json = await res.json();
+
+      // Leer como texto primero para evitar error si no es JSON válido
+      const rawResponse = await res.text();
+      let json;
+      try {
+        json = JSON.parse(rawResponse);
+      } catch (e) {
+        throw new Error('El servidor devolvió una respuesta inválida. Intenta de nuevo.');
+      }
+
       if (!res.ok || !json.success) throw new Error(json.error || 'Error desconocido');
       clearInterval(msgInterval);
       renderResult(json.data, text);
