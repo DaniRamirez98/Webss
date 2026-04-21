@@ -56,74 +56,91 @@ app.post('/api/summarize', async (req, res) => {
 
   const prompt = `Eres un experto en síntesis de textos. Resume el siguiente texto de manera ${lengthMap[length] || lengthMap.moderado}, usando ${styleMap[style] || styleMap.general}.
 
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON:
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin backticks, sin explicaciones. Solo el JSON puro:
 {"titulo":"título aquí","resumen":"resumen aquí","puntos_clave":["punto 1","punto 2","punto 3"]}
 
-TEXTO:
+TEXTO A RESUMIR:
 ${text}`;
 
   try {
-const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-          responseMimeType: 'application/json'
-        }
-      })
-    });
+    // Intentar con gemini-2.0-flash primero, si falla usar gemini-pro
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro'];
+    let lastError = '';
+    
+    for (const model of models) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    const responseText = await geminiRes.text();
+      const geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 1024
+          }
+        })
+      });
 
-    if (!geminiRes.ok) {
-      console.error('Error Gemini status:', geminiRes.status, responseText);
-      return res.status(502).json({ error: 'Error al conectar con Gemini. Intenta más tarde.' });
+      const responseText = await geminiRes.text();
+      console.log(`Modelo ${model} - Status:`, geminiRes.status);
+
+      if (!geminiRes.ok) {
+        lastError = responseText;
+        console.error(`Modelo ${model} falló:`, responseText.substring(0, 200));
+        continue; // probar siguiente modelo
+      }
+
+      let geminiData;
+      try {
+        geminiData = JSON.parse(responseText);
+      } catch (e) {
+        lastError = 'Respuesta no es JSON válido';
+        continue;
+      }
+
+      const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!rawText) {
+        lastError = 'Gemini no devolvió texto';
+        console.error('Sin texto en respuesta:', JSON.stringify(geminiData).substring(0, 200));
+        continue;
+      }
+
+      // Limpiar y extraer JSON
+      const clean = rawText.replace(/```json|```/g, '').trim();
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+
+      if (!jsonMatch) {
+        lastError = 'No se encontró JSON en respuesta';
+        console.error('Sin JSON en:', clean.substring(0, 200));
+        continue;
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (parseErr) {
+        lastError = 'JSON malformado';
+        continue;
+      }
+
+      if (!parsed.titulo || !parsed.resumen) {
+        lastError = 'JSON incompleto';
+        continue;
+      }
+
+      console.log(`✅ Éxito con modelo: ${model}`);
+      return res.json({ success: true, data: parsed });
     }
 
-    let geminiData;
-    try {
-      geminiData = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Error parseando respuesta de Gemini:', responseText);
-      return res.status(502).json({ error: 'Respuesta inválida de Gemini.' });
-    }
-
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    if (!rawText) {
-      console.error('Gemini no devolvió texto:', JSON.stringify(geminiData));
-      return res.status(502).json({ error: 'Gemini no devolvió contenido. Intenta con un texto diferente.' });
-    }
-
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      console.error('No se encontró JSON en respuesta:', clean);
-      return res.status(502).json({ error: 'No se pudo procesar la respuesta. Intenta de nuevo.' });
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.error('Error parseando JSON extraído:', jsonMatch[0]);
-      return res.status(502).json({ error: 'Error al procesar el resumen. Intenta de nuevo.' });
-    }
-
-    if (!parsed.titulo || !parsed.resumen) {
-      return res.status(502).json({ error: 'Respuesta incompleta de Gemini. Intenta de nuevo.' });
-    }
-
-    return res.json({ success: true, data: parsed });
+    // Si todos los modelos fallaron
+    console.error('Todos los modelos fallaron. Último error:', lastError);
+    return res.status(502).json({ error: 'No se pudo conectar con Gemini. Verifica tu API Key.' });
 
   } catch (err) {
     console.error('Error del servidor:', err.message);
-    return res.status(500).json({ error: 'Error interno del servidor: ' + err.message });
+    return res.status(500).json({ error: 'Error interno: ' + err.message });
   }
 });
 
