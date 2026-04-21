@@ -92,9 +92,25 @@ ${text}`;
 
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
 
+    if (!rawText) {
+      return res.status(502).json({ error: 'Gemini no devolvió contenido. Intenta con un texto más corto.' });
+    }
+    // Limpiar markdown y extraer solo el JSON
+    const clean = rawText.replace(/```json|```/g, '').trim();
+    // Extraer el objeto JSON aunque venga con texto extra
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.status(502).json({ error: 'No se pudo procesar la respuesta de Gemini.' });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseErr) {
+      return res.status(502).json({ error: 'Respuesta de Gemini malformada. Intenta de nuevo.' });
+    }
+    
     return res.json({ success: true, data: parsed });
 
   } catch (err) {
