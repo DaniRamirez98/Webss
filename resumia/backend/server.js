@@ -42,13 +42,12 @@ app.post('/api/summarize', async (req, res) => {
   const prompt = `Resume este texto...`; 
 
 try {
-    // Usamos el ID técnico que NUNCA falla en México
     const modelId = 'gemini-1.5-flash'; 
     
-    // Cambiamos a la versión estable v1
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // CAMBIO A v1beta: Es más flexible con los modelos nuevos en nuestra región
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    console.log(`Conectando con modelo estable: ${modelId}`);
+    console.log(`Petición enviada a: ${geminiUrl.split('?')[0]}`); // Log de seguridad
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
@@ -62,20 +61,15 @@ try {
     
     if (!geminiRes.ok) {
       console.error("Error de Google:", responseText);
-      return res.status(502).json({ error: 'Error de conexión con Google.' });
+      return res.status(502).json({ error: 'Fallo la conexión con el modelo.' });
     }
 
     const geminiData = JSON.parse(responseText);
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Limpieza de JSON
     const clean = rawText.replace(/```json|```/g, '').trim();
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    
-    if (!jsonMatch) throw new Error('Respuesta malformada');
 
-    const parsed = JSON.parse(jsonMatch[0]);
-    return res.json({ success: true, data: parsed });
+    return res.json({ success: true, data: JSON.parse(jsonMatch[0]) });
 
   } catch (err) {
     console.error('Error:', err.message);
