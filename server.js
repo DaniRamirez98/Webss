@@ -39,7 +39,7 @@ app.post('/api/summarize', limiter, async (req, res) => {
       return res.status(400).json({ error: 'El texto es muy corto para generar un resumen de calidad.' });
     }
 
-    const modelId = 'gemini-1.5-flash-latest';
+    const modelId = 'gemini-2.5-flash';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const prompt = `Actúa como un experto en síntesis de información. 
